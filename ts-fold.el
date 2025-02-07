@@ -326,21 +326,28 @@ This function is borrowed from `tree-sitter-node-at-point'."
 ;; (@* "Overlays" )
 ;;
 
+(defun ts-fold--count-lines (beg end)
+  "Count the number of lines between BEG and END."
+  (count-lines beg end))
+
 (defun ts-fold--create-overlay (range)
   "Create invisible overlay in RANGE."
   (when range
     (let* ((beg (car range))
            (end (cdr range))
            (ov (make-overlay beg end))
-           (map (make-sparse-keymap)))
+           (map (make-sparse-keymap))
+           (line-count (ts-fold--count-lines beg end)))
       (define-key map (kbd "<mouse-1>") #'ts-fold-open)
       (overlay-put ov 'creator 'ts-fold)
       (overlay-put ov 'priority ts-fold-priority)
       (overlay-put ov 'invisible 'ts-fold)
       (overlay-put ov 'display
-                   (propertize (or (and ts-fold-summary-show
-                                        (ts-fold-summary--get (buffer-substring beg end)))
-                                   (ts-fold--truncate-string-ellipsis))
+                   (propertize (format "[%s <%d>]"
+                                       (or (and ts-fold-summary-show
+                                                (ts-fold-summary--get (buffer-substring beg end)))
+                                           (ts-fold--truncate-string-ellipsis))
+                                       line-count)
                                'mouse-face 'ts-fold-replacement-mouse-face
                                'help-echo "mouse-1: unfold this node"
                                'keymap map))
@@ -370,11 +377,17 @@ This function is borrowed from `tree-sitter-node-at-point'."
 (defun ts-fold--hide-ov (ov &rest _)
   "Hide the OV."
   (let ((beg (overlay-start ov))
-        (end (overlay-end ov)))
+        (end (overlay-end ov))
+        (line-count (ts-fold--count-lines beg end)))
     (overlay-put ov 'invisible 'ts-fold)
-    (overlay-put ov 'display (or (and ts-fold-summary-show
-                                      (ts-fold-summary--get (buffer-substring beg end)))
-                                 (ts-fold--truncate-string-ellipsis)))
+    (overlay-put ov 'display (propertize (format "%s (%d lines)"
+                                                 (or (and ts-fold-summary-show
+                                                          (ts-fold-summary--get (buffer-substring beg end)))
+                                                     (ts-fold--truncate-string-ellipsis))
+                                                 line-count)
+                                         'mouse-face 'ts-fold-replacement-mouse-face
+                                         'help-echo "mouse-1: unfold this node"
+                                         'keymap (overlay-get ov 'keymap)))
     (overlay-put ov 'face 'ts-fold-replacement-face))
   (ts-fold-indicators-refresh))
 
